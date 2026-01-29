@@ -1,3 +1,23 @@
+let socket = null;
+
+function connectWebSocket() {
+  socket = new WebSocket("ws://localhost:8000/ws");
+
+  socket.onopen = () => {
+    console.log("🟢 WebSocket connected");
+  };
+
+  socket.onerror = (err) => {
+    console.error("WebSocket error:", err);
+  };
+
+  socket.onclose = () => {
+    console.log("🔴 WebSocket closed");
+  };
+}
+
+
+
 console.log("Meet Monitor content script loaded");
 
 let mediaStream = null;
@@ -13,60 +33,62 @@ chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
 
 async function startMediaCapture() {
   try {
-    console.log("Requesting screen + audio permission...");
+    connectWebSocket();
 
     mediaStream = await navigator.mediaDevices.getDisplayMedia({
-      video: {
-        frameRate: 5
-      },
+      video: { frameRate: 5 },
       audio: true
     });
 
-    console.log("Media stream acquired:", mediaStream);
-
-    setupVideoCapture(mediaStream);
     setupAudioCapture(mediaStream);
+    setupVideoCapture(mediaStream);
 
   } catch (err) {
     console.error("Capture failed:", err);
   }
 }
+
 function setupAudioCapture(stream) {
-  const audioContext = new AudioContext();
-  const audioSource = audioContext.createMediaStreamSource(stream);
+  const audioContext = new AudioContext({ sampleRate: 16000 });
+  const source = audioContext.createMediaStreamSource(stream);
   const processor = audioContext.createScriptProcessor(4096, 1, 1);
 
-  processor.onaudioprocess = (event) => {
-    const audioData = event.inputBuffer.getChannelData(0);
-    console.log("Audio chunk received:", audioData.length);
+  processor.onaudioprocess = (e) => {
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
+
+    const audioData = e.inputBuffer.getChannelData(0);
+    socket.send(audioData.buffer);
   };
 
-  audioSource.connect(processor);
+  source.connect(processor);
   processor.connect(audioContext.destination);
 
-  console.log("Audio capture initialized");
+  console.log("🎧 Audio streaming started");
 }
+
 function setupVideoCapture(stream) {
-  videoElement = document.createElement("video");
-  videoElement.srcObject = stream;
-  videoElement.muted = true;
-  videoElement.play();
+  const video = document.createElement("video");
+  video.srcObject = stream;
+  video.muted = true;
+  video.play();
 
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
 
-  captureInterval = setInterval(() => {
-    if (videoElement.videoWidth === 0) return;
+  setInterval(() => {
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
+    if (video.videoWidth === 0) return;
 
-    canvas.width = videoElement.videoWidth;
-    canvas.height = videoElement.videoHeight;
-    ctx.drawImage(videoElement, 0, 0);
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0);
 
     canvas.toBlob((blob) => {
-      console.log("Video frame captured:", blob.size, "bytes");
+      if (blob) socket.send(blob);
     }, "image/jpeg", 0.6);
 
   }, 1000);
 
-  console.log("Video capture initialized");
+  console.log("🎥 Video streaming started");
 }
+
