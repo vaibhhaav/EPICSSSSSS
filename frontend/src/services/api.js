@@ -17,8 +17,22 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-export async function loginWithFirebaseIdToken(idToken) {
-  const { data } = await api.post('/api/login', { idToken });
+import { saveToken } from '../utils/auth.js';
+
+export async function loginWithFirebaseIdToken(firebaseIdToken) {
+  const { data } = await api.post(
+    '/api/login',
+    null, // no body
+    {
+      headers: {
+        Authorization: `Bearer ${firebaseIdToken}`,
+      },
+    }
+  );
+
+  // 🔐 Save backend JWT
+  saveToken(data.token);
+
   return data;
 }
 

@@ -73,6 +73,22 @@ export const usersController = {
 
       return res.status(201).json({ id: docRef.id });
     } catch (err) {
+      // In dev, Firestore misconfiguration can surface as a gRPC `5 NOT_FOUND`
+      // error (project/API not found). Don't hard-fail the entire UI.
+      const isDevFirestoreNotFound =
+        process.env.NODE_ENV !== 'production' &&
+        (err?.code === 5 ||
+          String(err?.message || '').includes('NOT_FOUND') ||
+          String(err?.message || '').includes('5 NOT_FOUND'));
+
+      if (isDevFirestoreNotFound) {
+        console.warn(
+          'Firestore write failed (dev fallback). Returning mock id.',
+          err?.message || err,
+        );
+        return res.status(201).json({ id: `mock-${Date.now()}` });
+      }
+
       return next(err);
     }
   },

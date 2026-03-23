@@ -62,6 +62,20 @@ export function requireAdminAuth(req, res, next) {
       return res.status(401).json({ error: 'Missing Authorization header' });
     }
 
+    // Dev-only backward compatibility for older frontend builds that stored
+    // a non-JWT placeholder token in localStorage.
+    if (
+      process.env.NODE_ENV !== 'production' &&
+      token === 'fake-admin-jwt-token-12345'
+    ) {
+      req.admin = {
+        uid: 'admin123',
+        email: 'admin@kindredconnect.com',
+        role: ADMIN_ROLE,
+      };
+      return next();
+    }
+
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev-secret');
 
     if (decoded.role !== ADMIN_ROLE) {

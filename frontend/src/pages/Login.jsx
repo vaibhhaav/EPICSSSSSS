@@ -19,6 +19,7 @@ function ensureFirebase() {
   if (!firebaseApp) {
     firebaseApp = initializeApp(firebaseConfig);
     auth = getAuth(firebaseApp);
+    console.log('Firebase initialized:', !!auth);
   }
   return auth;
 }
@@ -55,7 +56,13 @@ const Login = () => {
     } finally {
       setLoading(false);
     }
+    const data = await loginWithFirebaseIdToken(idToken);
+
+console.log('Backend JWT:', data.token);
+
+saveToken(data.token);
   };
+  
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">

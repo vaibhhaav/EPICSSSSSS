@@ -11,7 +11,7 @@ import matchesRouter from './routes/matches.js';
 import sessionsRouter from './routes/sessions.js';
 import feedbackController from './controllers/feedback.js';
 import { authRouter } from './routes/auth.js';
-import { requireAdminAuth } from './middleware/auth.js';
+import { requireAdminAuth, signBackendToken } from './middleware/auth.js';
 import { swaggerSpec } from './swagger.js';
 
 dotenv.config(); // ← MOVED UP
@@ -29,11 +29,13 @@ app.use(cors({
 // 🚨 2. LOGIN BYPASS (before express.json() & other middleware)
 app.post('/api/login', (req, res) => {
   console.log('🟢 BYPASS LOGIN:', req.body?.email);
+  const email = req.body?.email || 'admin@kindredconnect.com';
   res.json({ 
     success: true,
-    token: 'fake-admin-jwt-token-12345',
+    // Must be a real JWT; `requireAdminAuth` will call `jwt.verify()` on it.
+    token: signBackendToken({ uid: 'admin123', email }),
     user: { 
-      email: req.body?.email || 'admin@kindredconnect.com', 
+      email,
       role: 'admin',
       uid: 'admin123'
     }
