@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { addDoc, collection } from 'firebase/firestore';
+import { db } from './firebase.js';
 
 export default function SessionModal({ open, approvedConnections, onClose, onSubmit, loading }) {
   const [form, setForm] = useState({ connectionId: '', date: '', time: '' });
@@ -16,9 +18,32 @@ export default function SessionModal({ open, approvedConnections, onClose, onSub
     setError('');
     if (!form.connectionId || !form.date || !form.time) {
       setError('All fields are required.');
+      alert('Please complete all required fields');
       return;
     }
-    await onSubmit(form);
+
+    const formData = {
+      connectionId: String(form.connectionId).trim(),
+      date: String(form.date).trim(),
+      time: String(form.time).trim(),
+    };
+
+    console.log('Submitting:', formData);
+
+    try {
+      await addDoc(collection(db, 'sessions'), {
+        ...formData,
+        status: 'scheduled',
+        createdAt: new Date(),
+      });
+      await onSubmit?.(formData);
+      console.log('Saved successfully');
+      alert('Data added successfully');
+      setForm({ connectionId: '', date: '', time: '' });
+    } catch (saveError) {
+      console.error(saveError);
+      alert('Error saving data');
+    }
   };
 
   return (

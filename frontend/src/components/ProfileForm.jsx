@@ -1,4 +1,6 @@
 import React, { useMemo, useState } from 'react';
+import { addDoc, collection } from 'firebase/firestore';
+import { db } from './firebase.js';
 
 const interestOptions = ['music', 'art', 'stories', 'games', 'nature', 'reading'];
 const personalityOptions = ['introvert', 'ambivert', 'extrovert'];
@@ -66,11 +68,53 @@ export default function ProfileForm({ open, type, onClose, onSubmit, loading }) 
     const missing = required.some((key) => !String(form[key]).trim());
     if (missing || form.interests.length === 0) {
       setError('Please complete all fields.');
+      alert('Please complete all required fields');
       return;
     }
 
-    await onSubmit({ ...form, institutionType: type, age: Number(form.age) });
-    setForm(initialForm);
+    const normalizedInterests = Array.isArray(form.interests)
+      ? form.interests
+      : String(form.interests)
+          .split(',')
+          .map((item) => item.trim())
+          .filter(Boolean);
+
+    const formData = {
+      ...form,
+      institutionType: type,
+      name: String(form.name).trim(),
+      personalityType: String(form.personalityType).trim(),
+      emotionalState: String(form.emotionalState).trim(),
+      attachmentStyle: String(form.attachmentStyle).trim(),
+      interests: normalizedInterests,
+      communicationStyle: String(form.communicationStyle).trim(),
+      availability: String(form.availability).trim(),
+      language: String(form.language).trim(),
+      traumaLevel: String(form.traumaLevel).trim(),
+      healthCondition: String(form.healthCondition || '').trim(),
+      age: Number(form.age),
+    };
+
+    if (isElder) {
+      formData.patienceLevel = String(form.patienceLevel).trim();
+    }
+
+    console.log('Submitting:', formData);
+
+    try {
+      await addDoc(collection(db, isElder ? 'elders' : 'orphans'), {
+        ...formData,
+        createdAt: new Date(),
+      });
+
+      console.log('Saved successfully');
+      alert('Data added successfully');
+      setForm(initialForm);
+      onClose?.();
+    } catch (saveError) {
+      console.error(saveError);
+      alert('Error saving data');
+    }
   };
 
   const inputStyle = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm';

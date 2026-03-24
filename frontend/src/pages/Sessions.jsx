@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import SessionModal from '../components/SessionModal.jsx';
-import { createSession, getConnections, getSessions } from '../services/api.js';
+import { getConnections, getSessions } from '../services/api.js';
 
 export default function Sessions() {
   const [sessions, setSessions] = useState([]);
   const [connections, setConnections] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState('');
 
@@ -36,17 +35,8 @@ export default function Sessions() {
       setError('Only approved connections can be scheduled.');
       return;
     }
-    setSaving(true);
-    setError('');
-    try {
-      await createSession({ connectionId, date, time });
-      setOpen(false);
-      await loadData();
-    } catch (err) {
-      setError(err?.response?.data?.message || 'Failed to schedule session.');
-    } finally {
-      setSaving(false);
-    }
+    setOpen(false);
+    await loadData();
   };
 
   return (
@@ -115,7 +105,7 @@ export default function Sessions() {
         approvedConnections={approvedConnections}
         onClose={() => setOpen(false)}
         onSubmit={schedule}
-        loading={saving}
+        loading={loading}
       />
     </section>
   );
