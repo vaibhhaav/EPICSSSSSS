@@ -74,7 +74,7 @@ export default function Matching() {
         <select
           value={orphanId}
           onChange={(event) => setOrphanId(event.target.value)}
-          className="min-w-64 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+          className="w-full sm:w-auto sm:min-w-64 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
         >
           <option value="">Select orphan</option>
           {orphans.map((orphan) => (
@@ -95,7 +95,7 @@ export default function Matching() {
 
       {error && <p className="text-sm text-rose-600">{error}</p>}
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {matches.map((match) => (
           <MatchCard
             key={match.id || match.elderId}

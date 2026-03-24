@@ -69,7 +69,7 @@ export default function Sessions() {
       {error && <p className="text-sm text-rose-600">{error}</p>}
 
       <div className="overflow-x-auto rounded-xl border border-indigo-100 bg-white shadow-sm">
-        <table className="min-w-full text-sm">
+        <table className="min-w-[760px] w-full text-xs sm:text-sm">
           <thead className="bg-indigo-50 text-slate-700">
             <tr>
               <th className="px-3 py-2 text-left">Orphan</th>
