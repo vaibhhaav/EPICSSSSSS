@@ -1,13 +1,8 @@
-// services/api.js
-// Centralized Axios instance for calling the backend API.
-// Automatically attaches backend JWT from localStorage.
-
 import axios from 'axios';
 import { getToken } from '../utils/auth.js';
+import { saveToken } from '../utils/auth.js';
 
-const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000',
-});
+const api = axios.create({ baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000' });
 
 api.interceptors.request.use((config) => {
   const token = getToken();
@@ -17,23 +12,23 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-import { saveToken } from '../utils/auth.js';
+const asArray = (data, ...keys) => {
+  if (Array.isArray(data)) return data;
+  for (const key of keys) {
+    if (Array.isArray(data?.[key])) return data[key];
+  }
+  return [];
+};
 
-export async function loginWithFirebaseIdToken(firebaseIdToken) {
-  const { data } = await api.post(
-    '/api/login',
-    null, // no body
-    {
-      headers: {
-        Authorization: `Bearer ${firebaseIdToken}`,
-      },
-    }
-  );
-
-  // 🔐 Save backend JWT
-  saveToken(data.token);
-
+export async function login(payload) {
+  const { data } = await api.post('/api/login', payload);
+  if (data?.token) saveToken(data.token);
   return data;
+}
+
+export async function getProfiles(params = {}) {
+  const { data } = await api.get('/api/users', { params });
+  return asArray(data, 'profiles', 'users', 'data');
 }
 
 export async function createProfile(payload) {
@@ -41,27 +36,39 @@ export async function createProfile(payload) {
   return data;
 }
 
-export async function listProfiles(params = {}) {
-  const { data } = await api.get('/api/users', { params });
-  return data.profiles || [];
+export async function generateMatches(payload) {
+  const { data } = await api.post('/api/matches/generate', payload);
+  return asArray(data, 'matches', 'data');
 }
 
-export async function getMatches(elderId, orphanIds) {
-  const { data } = await api.post('/api/matches', {
-    elder_id: elderId,
-    orphan_ids: orphanIds,
-  });
-  return data.matches || [];
+export async function createMatch(payload) {
+  const { data } = await api.post('/api/matches', payload);
+  return data;
 }
 
-export async function scheduleSession(payload) {
+export async function getConnections() {
+  const { data } = await api.get('/api/connections');
+  return asArray(data, 'connections', 'data');
+}
+
+export async function updateConnectionStatus(id, payload) {
+  const { data } = await api.patch(`/api/connections/${id}`, payload);
+  return data;
+}
+
+export async function getSessions() {
+  const { data } = await api.get('/api/sessions');
+  return asArray(data, 'sessions', 'data');
+}
+
+export async function createSession(payload) {
   const { data } = await api.post('/api/sessions', payload);
   return data;
 }
 
-export async function listSessions(params = {}) {
-  const { data } = await api.get('/api/sessions', { params });
-  return data.sessions || [];
+export async function getFeedback() {
+  const { data } = await api.get('/api/feedback');
+  return asArray(data, 'feedback', 'data');
 }
 
 export async function submitFeedback(payload) {
@@ -70,4 +77,3 @@ export async function submitFeedback(payload) {
 }
 
 export default api;
-

@@ -1,147 +1,123 @@
 import React, { useEffect, useState } from 'react';
-import SessionScheduler from '../components/SessionScheduler.jsx';
-import FeedbackForm from '../components/FeedbackForm.jsx';
-import { listSessions } from '../services/api.js';
+import SessionModal from '../components/SessionModal.jsx';
+import { createSession, getConnections, getSessions } from '../services/api.js';
 
-const Sessions = () => {
+export default function Sessions() {
   const [sessions, setSessions] = useState([]);
+  const [connections, setConnections] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [open, setOpen] = useState(false);
   const [error, setError] = useState('');
-  const [selectedSession, setSelectedSession] = useState(null);
 
-  const refresh = async () => {
+  const loadData = async () => {
     setLoading(true);
     setError('');
     try {
-      const data = await listSessions();
-      setSessions(data);
+      const [sessionsData, connectionsData] = await Promise.all([getSessions(), getConnections()]);
+      setSessions(sessionsData);
+      setConnections(connectionsData);
     } catch (err) {
-      console.error(err);
-      setError('Failed to load sessions');
+      setError(err?.response?.data?.message || 'Failed to load sessions.');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    refresh();
+    loadData();
   }, []);
 
+  const approvedConnections = connections.filter((connection) => connection.status === 'approved');
+
+  const schedule = async ({ connectionId, date, time }) => {
+    const selected = approvedConnections.find((item) => item.id === connectionId);
+    if (!selected) {
+      setError('Only approved connections can be scheduled.');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      await createSession({ connectionId, date, time });
+      setOpen(false);
+      await loadData();
+    } catch (err) {
+      setError(err?.response?.data?.message || 'Failed to schedule session.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-semibold text-slate-900">Sessions</h2>
-        <p className="text-sm text-slate-600">
-          Schedule and review video sessions between matched elders and children. Capture
-          emotional feedback after each call.
-        </p>
+    <section className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-2xl font-semibold text-slate-900">Sessions</h2>
+          <p className="text-sm text-slate-600">Schedule sessions for approved connections only.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="rounded-lg bg-indigo-600 px-3 py-2 text-sm text-white hover:bg-indigo-500"
+        >
+          Schedule Session
+        </button>
       </div>
 
-      <SessionScheduler onScheduled={refresh} />
+      {loading && <p className="text-sm text-slate-500">Loading sessions...</p>}
+      {error && <p className="text-sm text-rose-600">{error}</p>}
 
-      <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="font-semibold text-slate-800">Session History</h3>
-          {loading && <span className="text-xs text-slate-500">Loading…</span>}
-        </div>
-        {error && (
-          <p className="text-xs text-red-600 border border-red-200 bg-red-50 rounded-md px-2 py-1 mb-2">
-            {error}
-          </p>
-        )}
-        <div className="overflow-x-auto text-sm">
-          <table className="min-w-full border border-slate-200 rounded-md overflow-hidden">
-            <thead className="bg-slate-50">
-              <tr>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 border-b">
-                  When
-                </th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 border-b">
-                  Elder ID
-                </th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 border-b">
-                  Orphan ID
-                </th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 border-b">
-                  Link
-                </th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 border-b">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {sessions.map((s) => (
-                <tr key={s.id} className="border-b last:border-b-0">
-                  <td className="px-3 py-2 text-xs text-slate-700">
-                    {new Date(s.scheduled_at).toLocaleString()}
-                  </td>
-                  <td className="px-3 py-2 text-xs text-slate-700">{s.elder_id}</td>
-                  <td className="px-3 py-2 text-xs text-slate-700">{s.orphan_id}</td>
-                  <td className="px-3 py-2 text-xs">
-                    <a
-                      href={s.video_link}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-primary-600 hover:underline"
-                    >
-                      Open call
+      <div className="overflow-x-auto rounded-xl border border-indigo-100 bg-white shadow-sm">
+        <table className="min-w-full text-sm">
+          <thead className="bg-indigo-50 text-slate-700">
+            <tr>
+              <th className="px-3 py-2 text-left">Orphan</th>
+              <th className="px-3 py-2 text-left">Elder</th>
+              <th className="px-3 py-2 text-left">Date</th>
+              <th className="px-3 py-2 text-left">Time</th>
+              <th className="px-3 py-2 text-left">Meet Link</th>
+              <th className="px-3 py-2 text-left">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sessions.map((session) => (
+              <tr key={session.id} className="border-t border-indigo-50">
+                <td className="px-3 py-2">{session.orphanName || session.orphan?.name || '-'}</td>
+                <td className="px-3 py-2">{session.elderName || session.elder?.name || '-'}</td>
+                <td className="px-3 py-2">{session.date || '-'}</td>
+                <td className="px-3 py-2">{session.time || '-'}</td>
+                <td className="px-3 py-2">
+                  {session.meetLink ? (
+                    <a className="text-indigo-700 hover:underline" href={session.meetLink} target="_blank" rel="noreferrer">
+                      Join
                     </a>
-                  </td>
-                  <td className="px-3 py-2 text-xs">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedSession(s)}
-                      className="inline-flex items-center px-2 py-1 rounded-md border border-slate-200 text-slate-700 hover:bg-slate-50"
-                    >
-                      Add feedback
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {sessions.length === 0 && !loading && (
-                <tr>
-                  <td
-                    colSpan={5}
-                    className="px-3 py-4 text-xs text-slate-500 text-center"
-                  >
-                    No sessions yet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+                  ) : (
+                    '-'
+                  )}
+                </td>
+                <td className="px-3 py-2 capitalize">{session.status || 'scheduled'}</td>
+              </tr>
+            ))}
+            {!loading && sessions.length === 0 && (
+              <tr>
+                <td className="px-3 py-4 text-center text-xs text-slate-500" colSpan={6}>
+                  No sessions found.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
 
-      {selectedSession && (
-        <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="font-semibold text-slate-800">Post-session Feedback</h3>
-            <button
-              type="button"
-              onClick={() => setSelectedSession(null)}
-              className="text-xs text-slate-500 hover:text-slate-700"
-            >
-              Close
-            </button>
-          </div>
-          <p className="text-xs text-slate-500 mb-2">
-            Session on {new Date(selectedSession.scheduled_at).toLocaleString()} •{' '}
-            <span className="font-medium">Elder:</span> {selectedSession.elder_id} •{' '}
-            <span className="font-medium">Orphan:</span> {selectedSession.orphan_id}
-          </p>
-          <FeedbackForm
-            session={selectedSession}
-            onSubmitted={() => {
-              setSelectedSession(null);
-            }}
-          />
-        </section>
-      )}
-    </div>
+      <SessionModal
+        open={open}
+        approvedConnections={approvedConnections}
+        onClose={() => setOpen(false)}
+        onSubmit={schedule}
+        loading={saving}
+      />
+    </section>
   );
-};
-
-export default Sessions;
+}
 
