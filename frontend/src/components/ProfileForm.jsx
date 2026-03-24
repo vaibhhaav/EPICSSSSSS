@@ -1,10 +1,17 @@
 import React, { useMemo, useState } from 'react';
+import { addDoc, collection } from 'firebase/firestore';
+import { db } from './firebase.js';
 
 const interestOptions = ['music', 'art', 'stories', 'games', 'nature', 'reading'];
+const personalityOptions = ['introvert', 'ambivert', 'extrovert'];
 const communicationOptions = ['verbal', 'non-verbal', 'mixed'];
-const emotionalStateOptions = ['calm', 'anxious', 'sad', 'happy', 'neutral'];
-const attachmentOptions = ['secure', 'avoidant', 'ambivalent', 'disorganized'];
+const emotionalStateOptions = ['calm', 'anxious', 'sad', 'happy', 'neutral', 'irritated'];
+const attachmentOptions = ['secure', 'avoidant', 'ambivalent', 'disorganized', 'anxious'];
 const availabilityOptions = ['morning', 'afternoon', 'evening'];
+const traumaLevelOptions = ['none', 'mild', 'moderate', 'severe'];
+const languageOptions = ['english', 'hindi', 'regional'];
+const patienceLevelOptions = ['low', 'medium', 'high'];
+const healthConditionOptions = ['healthy', 'at risk', 'chronic'];
 
 const initialForm = {
   name: '',
@@ -61,23 +68,68 @@ export default function ProfileForm({ open, type, onClose, onSubmit, loading }) 
     const missing = required.some((key) => !String(form[key]).trim());
     if (missing || form.interests.length === 0) {
       setError('Please complete all fields.');
+      alert('Please complete all required fields');
       return;
     }
 
-    await onSubmit({ ...form, institutionType: type, age: Number(form.age) });
-    setForm(initialForm);
+    const normalizedInterests = Array.isArray(form.interests)
+      ? form.interests
+      : String(form.interests)
+          .split(',')
+          .map((item) => item.trim())
+          .filter(Boolean);
+
+    const formData = {
+      ...form,
+      institutionType: type,
+      name: String(form.name).trim(),
+      personalityType: String(form.personalityType).trim(),
+      emotionalState: String(form.emotionalState).trim(),
+      attachmentStyle: String(form.attachmentStyle).trim(),
+      interests: normalizedInterests,
+      communicationStyle: String(form.communicationStyle).trim(),
+      availability: String(form.availability).trim(),
+      language: String(form.language).trim(),
+      traumaLevel: String(form.traumaLevel).trim(),
+      healthCondition: String(form.healthCondition || '').trim(),
+      age: Number(form.age),
+    };
+
+    if (isElder) {
+      formData.patienceLevel = String(form.patienceLevel).trim();
+    }
+
+    console.log('Submitting:', formData);
+
+    try {
+      await addDoc(collection(db, isElder ? 'elders' : 'orphans'), {
+        ...formData,
+        createdAt: new Date(),
+      });
+
+      console.log('Saved successfully');
+      alert('Data added successfully');
+      setForm(initialForm);
+      onClose?.();
+    } catch (saveError) {
+      console.error(saveError);
+      alert('Error saving data');
+    }
   };
 
   const inputStyle = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-      <div className="w-full max-w-2xl rounded-xl bg-white p-5 shadow-lg">
+      <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl bg-white p-4 sm:p-5 shadow-lg">
         <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
         <form className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2" onSubmit={handleSubmit}>
           <input name="name" placeholder="Name" value={form.name} onChange={updateField} className={inputStyle} />
           <input name="age" type="number" placeholder="Age" value={form.age} onChange={updateField} className={inputStyle} />
-          <input name="personalityType" placeholder="Personality Type" value={form.personalityType} onChange={updateField} className={inputStyle} />
+          <select name="personalityType" value={form.personalityType} onChange={updateField} className={inputStyle}>
+            <option value="">Personality Type</option>
+            {personalityOptions.map((value) => <option key={value} value={value}>{value}</option>)}
+          </select>
           <select name="emotionalState" value={form.emotionalState} onChange={updateField} className={inputStyle}>
             <option value="">Emotional State</option>
             {emotionalStateOptions.map((value) => <option key={value} value={value}>{value}</option>)}
@@ -97,18 +149,30 @@ export default function ProfileForm({ open, type, onClose, onSubmit, loading }) 
             <option value="">Availability</option>
             {availabilityOptions.map((value) => <option key={value} value={value}>{value}</option>)}
           </select>
-          <input name="traumaLevel" placeholder="Trauma Level" value={form.traumaLevel} onChange={updateField} className={inputStyle} />
-          <input name="language" placeholder="Language" value={form.language} onChange={updateField} className={inputStyle} />
+          <select name="traumaLevel" value={form.traumaLevel} onChange={updateField} className={inputStyle}>
+            <option value="">Trauma Level</option>
+            {traumaLevelOptions.map((value) => <option key={value} value={value}>{value}</option>)}
+          </select>
+          <select name="language" value={form.language} onChange={updateField} className={inputStyle}>
+            <option value="">Language</option>
+            {languageOptions.map((value) => <option key={value} value={value}>{value}</option>)}
+          </select>
           {isElder && (
             <>
-              <input name="patienceLevel" placeholder="Patience Level" value={form.patienceLevel} onChange={updateField} className={inputStyle} />
-              <input name="healthCondition" placeholder="Health Condition" value={form.healthCondition} onChange={updateField} className={inputStyle} />
+              <select name="patienceLevel" value={form.patienceLevel} onChange={updateField} className={inputStyle}>
+                <option value="">Patience Level</option>
+                {patienceLevelOptions.map((value) => <option key={value} value={value}>{value}</option>)}
+              </select>
+              <select name="healthCondition" value={form.healthCondition} onChange={updateField} className={inputStyle}>
+                <option value="">Health Condition</option>
+                {healthConditionOptions.map((value) => <option key={value} value={value}>{value}</option>)}
+              </select>
             </>
           )}
           {error && <p className="md:col-span-2 text-xs text-rose-600">{error}</p>}
-          <div className="md:col-span-2 flex justify-end gap-2">
-            <button type="button" onClick={onClose} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">Cancel</button>
-            <button type="submit" disabled={loading} className="rounded-lg bg-indigo-600 px-3 py-2 text-sm text-white disabled:opacity-60">
+          <div className="md:col-span-2 flex flex-col-reverse sm:flex-row justify-end gap-2">
+            <button type="button" onClick={onClose} className="w-full sm:w-auto rounded-lg border border-slate-300 px-3 py-2 text-sm">Cancel</button>
+            <button type="submit" disabled={loading} className="w-full sm:w-auto rounded-lg bg-indigo-600 px-3 py-2 text-sm text-white disabled:opacity-60">
               {loading ? 'Saving...' : 'Save Profile'}
             </button>
           </div>

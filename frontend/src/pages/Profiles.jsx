@@ -67,7 +67,7 @@ export default function Profiles() {
         </button>
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <button
           type="button"
           onClick={() => setTab('orphan')}
@@ -87,7 +87,7 @@ export default function Profiles() {
       {loading && <p className="text-sm text-slate-500">Loading profiles...</p>}
       {error && <p className="text-sm text-rose-600">{error}</p>}
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {filteredProfiles.map((profile) => (
           <ProfileCard key={profile.id} profile={profile} />
         ))}

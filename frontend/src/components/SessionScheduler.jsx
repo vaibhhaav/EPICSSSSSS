@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { listProfiles, scheduleSession } from '../services/api.js';
+import { collection, addDoc } from 'firebase/firestore';
+import { db } from './firebase.js';
+import { getProfiles } from '../services/api.js';
 
 const SessionScheduler = ({ onScheduled }) => {
   const [elders, setElders] = useState([]);
@@ -17,8 +19,8 @@ const SessionScheduler = ({ onScheduled }) => {
     async function loadProfiles() {
       try {
         const [e, o] = await Promise.all([
-          listProfiles({ type: 'elder' }),
-          listProfiles({ type: 'orphan' }),
+          getProfiles({ type: 'elder' }),
+          getProfiles({ type: 'orphan' }),
         ]);
         setElders(e);
         setOrphans(o);
@@ -40,14 +42,27 @@ const SessionScheduler = ({ onScheduled }) => {
     setError('');
     setLoading(true);
     try {
-      const payload = {
-        elder_id: form.elder_id,
-        orphan_id: form.orphan_id,
+      if (!form.elder_id || !form.orphan_id || !form.scheduled_at) {
+        alert('Please complete all required fields');
+        return;
+      }
+
+      const formData = {
+        elder_id: String(form.elder_id).trim(),
+        orphan_id: String(form.orphan_id).trim(),
         scheduled_at: new Date(form.scheduled_at).toISOString(),
         duration_minutes: Number(form.duration_minutes),
       };
-      const res = await scheduleSession(payload);
-      onScheduled?.(res);
+
+      console.log('Submitting:', formData);
+
+      await addDoc(collection(db, 'sessions'), {
+        ...formData,
+        createdAt: new Date(),
+      });
+      onScheduled?.(formData);
+      console.log('Saved successfully');
+      alert('Data added successfully');
       setForm({
         elder_id: '',
         orphan_id: '',
@@ -56,6 +71,7 @@ const SessionScheduler = ({ onScheduled }) => {
       });
     } catch (err) {
       console.error(err);
+      alert('Error saving data');
       setError('Failed to schedule session');
     } finally {
       setLoading(false);

@@ -86,7 +86,7 @@ export default function Feedback() {
         <p className="text-sm text-slate-600">Submit post-session outcomes for completed sessions.</p>
       </div>
 
-      <form className="grid grid-cols-1 gap-3 rounded-xl border border-indigo-100 bg-white p-4 md:grid-cols-4" onSubmit={handleSubmit}>
+      <form className="grid grid-cols-1 gap-3 rounded-xl border border-indigo-100 bg-white p-3 sm:p-4 md:grid-cols-2 xl:grid-cols-4" onSubmit={handleSubmit}>
         <select name="sessionId" value={form.sessionId} onChange={handleChange} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">
           <option value="">Select completed session</option>
           {completedSessions.map((session) => (
@@ -124,12 +124,12 @@ export default function Feedback() {
           ))}
         </select>
 
-        <div className="md:col-span-4 flex items-center justify-between">
+        <div className="md:col-span-2 xl:col-span-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           {error ? <p className="text-sm text-rose-600">{error}</p> : <span />}
           <button
             type="submit"
             disabled={saving}
-            className="rounded-lg bg-indigo-600 px-3 py-2 text-sm text-white hover:bg-indigo-500 disabled:opacity-60"
+            className="w-full sm:w-auto rounded-lg bg-indigo-600 px-3 py-2 text-sm text-white hover:bg-indigo-500 disabled:opacity-60"
           >
             {saving ? 'Submitting...' : 'Submit Feedback'}
           </button>
