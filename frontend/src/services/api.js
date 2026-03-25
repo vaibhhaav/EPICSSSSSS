@@ -46,6 +46,11 @@ export async function createMatch(payload) {
   return data;
 }
 
+export async function autoMatchAll() {
+  const { data } = await api.post('/api/matches/auto-match');
+  return data;
+}
+
 export async function getConnections() {
   const { data } = await api.get('/api/connections');
   return asArray(data, 'connections', 'data');

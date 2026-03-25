@@ -11,7 +11,7 @@ const availabilityOptions = ['morning', 'afternoon', 'evening'];
 const traumaLevelOptions = ['none', 'mild', 'moderate', 'severe'];
 const languageOptions = ['english', 'hindi', 'regional'];
 const patienceLevelOptions = ['low', 'medium', 'high'];
-const healthConditionOptions = ['healthy', 'at risk', 'chronic'];
+const healthConditionOptions = ['good', 'moderate', 'critical'];
 
 const initialForm = {
   name: '',

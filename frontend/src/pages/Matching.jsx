@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import MatchCard from '../components/MatchCard.jsx';
-import { createMatch, generateMatches, getProfiles } from '../services/api.js';
+import { autoMatchAll, createMatch, generateMatches, getProfiles } from '../services/api.js';
 
 export default function Matching() {
   const [profiles, setProfiles] = useState([]);
@@ -9,6 +9,10 @@ export default function Matching() {
   const [loading, setLoading] = useState(false);
   const [creatingId, setCreatingId] = useState('');
   const [error, setError] = useState('');
+  const [autoMatchLoading, setAutoMatchLoading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [autoMatched, setAutoMatched] = useState(false);
+  const [highlightMatchIds, setHighlightMatchIds] = useState([]);
 
   useEffect(() => {
     (async () => {
@@ -35,6 +39,9 @@ export default function Matching() {
       return;
     }
     setError('');
+    setSuccessMessage('');
+    setAutoMatched(false);
+    setHighlightMatchIds([]);
     setLoading(true);
     try {
       const generated = await generateMatches({ orphanId });
@@ -63,11 +70,55 @@ export default function Matching() {
     }
   };
 
+  const runAutoMatchAll = async () => {
+    const confirmed = window.confirm(
+      'Auto Match All will pair elders with the best available orphans and create active connections. Continue?',
+    );
+    if (!confirmed) return;
+
+    setError('');
+    setSuccessMessage('');
+    setAutoMatched(false);
+    setHighlightMatchIds([]);
+    setAutoMatchLoading(true);
+
+    try {
+      const result = await autoMatchAll();
+      const created = result?.matches || [];
+      setMatches(created);
+      setHighlightMatchIds(created.map((m) => m.id).filter(Boolean));
+      setAutoMatched(true);
+      setSuccessMessage('All profiles matched successfully');
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.response?.data?.message || 'Auto match failed.');
+    } finally {
+      setAutoMatchLoading(false);
+    }
+  };
+
   return (
     <section className="space-y-4">
       <div>
         <h2 className="text-2xl font-semibold text-slate-900">Matching</h2>
         <p className="text-sm text-slate-600">Generate ML-based elder matches for selected orphan profiles.</p>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={runAutoMatchAll}
+          disabled={autoMatchLoading || loading}
+          className="auto-match-btn"
+        >
+          {autoMatchLoading ? (
+            <span className="inline-flex items-center gap-2">
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              Matching...
+            </span>
+          ) : (
+            'Auto Match All'
+          )}
+        </button>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -94,6 +145,7 @@ export default function Matching() {
       </div>
 
       {error && <p className="text-sm text-rose-600">{error}</p>}
+      {successMessage && <p className="text-sm text-emerald-600">{successMessage}</p>}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {matches.map((match) => (
@@ -102,6 +154,8 @@ export default function Matching() {
             match={match}
             loading={creatingId === (match.elderId || match.id)}
             onCreateConnection={createConnection}
+            showCreateConnection={!autoMatched}
+            highlight={autoMatched && highlightMatchIds.includes(match.id)}
           />
         ))}
       </div>
