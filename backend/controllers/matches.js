@@ -146,14 +146,8 @@ export const matchesController = {
         db.collection(PROFILES_COLLECTION).where('type', '==', 'orphan').get(),
       ]);
 
-      const elders = elderSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      const orphans = orphanSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+      const elders = elderSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      const orphans = orphanSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
       if (elders.length === 0) {
         return res.status(404).json({ error: 'No elder profiles found.' });
@@ -162,8 +156,9 @@ export const matchesController = {
         return res.status(404).json({ error: 'No orphan profiles found.' });
       }
 
-      // Load active existing connections to avoid re-creating duplicates.
-      const existingPairs = new Set();
+      // Prevent duplicates by skipping already-active connections.
+      const activePairs = new Set();
+      const activeOrphanIds = new Set();
       const existingConnectionsSnapshot = await db
         .collection(CONNECTIONS_COLLECTION)
         .where('status', '==', 'active')
@@ -173,106 +168,140 @@ export const matchesController = {
         const d = doc.data() || {};
         const elderId = d.elderId || d.elder_id;
         const orphanId = d.orphanId || d.orphan_id;
-        if (elderId && orphanId) existingPairs.add(`${elderId}|${orphanId}`);
+        if (elderId && orphanId) {
+          activePairs.add(`${elderId}|${orphanId}`);
+          activeOrphanIds.add(orphanId);
+        }
       });
 
-      let mlAvailable = false;
-      if (mlBaseUrl) {
-        mlAvailable = await isMlServiceAvailable(mlBaseUrl);
+      const orphansToMatch = orphans.filter((o) => !activeOrphanIds.has(o.id));
+      if (orphansToMatch.length === 0) {
+        return res
+          .status(404)
+          .json({ matches: [], createdCount: 0, error: 'No orphans available to match.' });
       }
 
+      const elderById = new Map(elders.map((e) => [e.id, e]));
+      const orphanById = new Map(orphansToMatch.map((o) => [o.id, o]));
+
+      const now = new Date();
       const matchedOrphans = new Set();
       const createdMatches = [];
 
-      for (const elder of elders) {
-        // Only consider orphans not already matched in this run (and not already connected).
-        const remainingOrphans = orphans.filter((o) => {
-          if (matchedOrphans.has(o.id)) return false;
-          const key = `${elder.id}|${o.id}`;
-          return !existingPairs.has(key);
+      let mlAvailable = false;
+      if (mlBaseUrl) mlAvailable = await isMlServiceAvailable(mlBaseUrl);
+
+      if (mlAvailable) {
+        const toMlProfile = (p) => ({
+          id: p.id,
+          age: p.age,
+          name: p.name,
+          hobbies: p.hobbies,
+          languages: p.languages,
+          emotional_needs: p.emotional_needs,
+          personality: p.personality || p.personalityType,
+          communication: p.communication || p.communicationStyle,
+          availability: p.availability || p.availability_slots || p.availabilitySlots,
+          traumaLevel: p.traumaLevel || p.trauma_level || p.orphan_trauma_level,
+          patienceLevel: p.patienceLevel || p.patience_level || p.elder_patience_level,
+          emotional_state: p.emotional_state || p.emotionalState,
+          interests: p.interests,
+          language: p.language,
         });
 
-        if (remainingOrphans.length === 0) continue;
+        const mlElders = elders.map(toMlProfile);
+        const mlOrphans = orphansToMatch.map(toMlProfile);
 
-        let bestOrphan = null;
-        let bestScore = -Infinity;
+        const mlResponse = await axios.post(`${mlBaseUrl}/auto-match`, {
+          elders: mlElders,
+          orphans: mlOrphans,
+        });
 
-        if (mlAvailable) {
-          // One ML call per elder (scores all remaining orphans in a batch).
-          const mlResponse = await axios.post(`${mlBaseUrl}/match-profiles`, {
-            elder_profile: { id: elder.id, ...elder },
-            orphan_profiles: remainingOrphans,
+        const payload = mlResponse.data;
+        const matches = Array.isArray(payload) ? payload : payload?.matches || [];
+
+        for (const m of matches) {
+          const elderId = m?.elderId || m?.elder_id || m?.elderId;
+          const orphanId = m?.orphanId || m?.orphan_id || m?.orphanId;
+          const score = Number(m?.score ?? m?.compatibilityScore);
+          if (!elderId || !orphanId || Number.isNaN(score)) continue;
+
+          if (activePairs.has(`${elderId}|${orphanId}`)) continue;
+          if (matchedOrphans.has(orphanId)) continue;
+
+          const elder = elderById.get(elderId);
+          const orphan = orphanById.get(orphanId);
+          if (!elder || !orphan) continue;
+
+          const docRef = await db.collection(CONNECTIONS_COLLECTION).add({
+            elderId,
+            orphanId,
+            compatibilityScore: score,
+            status: 'active',
+            createdAt: now,
           });
 
-          const { matches } = mlResponse.data || {};
-          const top = Array.isArray(matches) ? matches : [];
+          activePairs.add(`${elderId}|${orphanId}`);
+          matchedOrphans.add(orphanId);
 
-          for (const m of top) {
-            const orphanId = m.orphan_id || m.orphanId;
-            const score = Number(m.score);
-            if (!orphanId || Number.isNaN(score)) continue;
+          createdMatches.push({
+            id: docRef.id,
+            elderId,
+            orphanId,
+            elderName: elder.name || elder.fullName || `Elder #${elderId}`,
+            orphanName: orphan.name || orphan.fullName || `Orphan #${orphanId}`,
+            compatibilityScore: score,
+            status: 'active',
+            createdAt: now,
+          });
+        }
+      } else {
+        // Fallback: greedy elder -> best orphan (deterministic overlap scoring).
+        for (const elder of elders) {
+          if (matchedOrphans.size >= orphansToMatch.length) break;
 
-            // remainingOrphans already filters, but keep the guard for safety.
-            const orphan = remainingOrphans.find((o) => o.id === orphanId);
-            if (!orphan) continue;
+          let bestOrphan = null;
+          let bestScore = -Infinity;
 
-            if (score > bestScore) {
-              bestScore = score;
-              bestOrphan = orphan;
-            }
-          }
+          for (const orphan of orphansToMatch) {
+            if (matchedOrphans.has(orphan.id)) continue;
+            const pairKey = `${elder.id}|${orphan.id}`;
+            if (activePairs.has(pairKey)) continue;
 
-          // If ML returned no usable matches, fall back for this elder.
-          if (!bestOrphan) {
-            for (const orphan of remainingOrphans) {
-              const score = computeFallbackCompatibility(elder, orphan);
-              if (score > bestScore) {
-                bestScore = score;
-                bestOrphan = orphan;
-              }
-            }
-          }
-        } else {
-          // Fallback scoring when ML service is unavailable/unreachable.
-          for (const orphan of remainingOrphans) {
             const score = computeFallbackCompatibility(elder, orphan);
             if (score > bestScore) {
               bestScore = score;
               bestOrphan = orphan;
             }
           }
+
+          if (!bestOrphan) continue;
+
+          const docRef = await db.collection(CONNECTIONS_COLLECTION).add({
+            elderId: elder.id,
+            orphanId: bestOrphan.id,
+            compatibilityScore: bestScore,
+            status: 'active',
+            createdAt: now,
+          });
+
+          activePairs.add(`${elder.id}|${bestOrphan.id}`);
+          matchedOrphans.add(bestOrphan.id);
+
+          createdMatches.push({
+            id: docRef.id,
+            elderId: elder.id,
+            orphanId: bestOrphan.id,
+            elderName: elder.name || elder.fullName || `Elder #${elder.id}`,
+            orphanName: bestOrphan.name || bestOrphan.fullName || `Orphan #${bestOrphan.id}`,
+            compatibilityScore: bestScore,
+            status: 'active',
+            createdAt: now,
+          });
         }
-
-        if (!bestOrphan) continue;
-
-        const now = new Date();
-        const docRef = await db.collection(CONNECTIONS_COLLECTION).add({
-          orphanId: bestOrphan.id,
-          elderId: elder.id,
-          compatibilityScore: bestScore,
-          status: 'active',
-          createdAt: now,
-        });
-
-        existingPairs.add(`${elder.id}|${bestOrphan.id}`);
-        matchedOrphans.add(bestOrphan.id);
-
-        createdMatches.push({
-          id: docRef.id,
-          orphanId: bestOrphan.id,
-          elderId: elder.id,
-          elderName: elder.name || elder.fullName || `Elder #${elder.id}`,
-          orphanName: bestOrphan.name || bestOrphan.fullName || `Orphan #${bestOrphan.id}`,
-          compatibilityScore: bestScore,
-          status: 'active',
-          createdAt: now,
-        });
       }
 
-      return res.json({
-        matches: createdMatches,
-        createdCount: createdMatches.length,
-      });
+      return res.json({ matches: createdMatches, createdCount: createdMatches.length });
     } catch (err) {
       return next(err);
     }
