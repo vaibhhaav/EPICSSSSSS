@@ -85,10 +85,18 @@ export default function Matching() {
     try {
       const result = await autoMatchAll();
       const created = result?.matches || [];
-      setMatches(created);
-      setHighlightMatchIds(created.map((m) => m.id).filter(Boolean));
-      setAutoMatched(true);
-      setSuccessMessage('All profiles matched successfully');
+      const createdCount = Number(result?.createdCount ?? created.length);
+      if (createdCount > 0) {
+        setMatches(created);
+        setHighlightMatchIds(created.map((m) => m.id).filter(Boolean));
+        setAutoMatched(true);
+        setSuccessMessage('All profiles matched successfully');
+      } else {
+        setAutoMatched(false);
+        setHighlightMatchIds([]);
+        setMatches([]);
+        setError(result?.error || 'No orphans available to match.');
+      }
     } catch (err) {
       setError(err?.response?.data?.error || err?.response?.data?.message || 'Auto match failed.');
     } finally {

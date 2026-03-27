@@ -22,7 +22,7 @@ from typing import List, Dict, Any
 from fastapi import FastAPI
 from pydantic import BaseModel
 
-from profile_matching import matcher
+from profile_matching import auto_match_all, matcher
 from sentiment_analysis import analyze_text
 
 
@@ -37,10 +37,26 @@ class Profile(BaseModel):
     emotional_needs: List[str] = []
     institution: str | None = None
 
+    # Optional feature-engineering fields (used by calculate_compatibility()).
+    # These may not exist in Firestore yet; the scorer handles missing gracefully.
+    personality: str | None = None
+    communication: str | None = None
+    availability: int | float | None = None
+    traumaLevel: str | None = None
+    patienceLevel: str | None = None
+    emotional_state: str | None = None
+    interests: List[str] = []
+    language: str | None = None
+
 
 class MatchRequest(BaseModel):
     elder_profile: Profile
     orphan_profiles: List[Profile]
+
+
+class AutoMatchRequest(BaseModel):
+    elders: List[Profile]
+    orphans: List[Profile]
 
 
 class SentimentRequest(BaseModel):
@@ -69,6 +85,22 @@ async def match_profiles(payload: MatchRequest):
 
     matches = matcher.score_pairs(elder_dict, orphan_dicts)
     return {"matches": matches}
+
+
+@app.post("/auto-match")
+async def auto_match(payload: AutoMatchRequest):
+    """
+    Bulk matching endpoint.
+
+    Returns a JSON array:
+    [
+      { "elderId": "...", "orphanId": "...", "score": 0.85 },
+      ...
+    ]
+    """
+    elders = [e.dict(exclude_unset=True) for e in payload.elders]
+    orphans = [o.dict(exclude_unset=True) for o in payload.orphans]
+    return auto_match_all(elders, orphans)
 
 
 @app.post("/analyze-sentiment")
