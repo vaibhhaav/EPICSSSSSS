@@ -19,6 +19,7 @@
 import { db } from '../models/firebase.js';
 
 const COLLECTION = 'profiles';
+<<<<<<< HEAD
 const TYPE_COLLECTION_MAP = {
   elder: 'elders',
   orphan: 'orphans',
@@ -92,6 +93,22 @@ function validateProfilePayload(payload) {
   }
   if (!payload.gender) {
     errors.push('gender is required');
+=======
+
+// Basic runtime validation to keep the API robust.
+function validateProfilePayload(payload) {
+  const requiredStringFields = ['type', 'name', 'gender', 'institution'];
+  const errors = [];
+
+  requiredStringFields.forEach((field) => {
+    if (!payload[field] || typeof payload[field] !== 'string') {
+      errors.push(`${field} is required and must be a string`);
+    }
+  });
+
+  if (payload.type !== 'elder' && payload.type !== 'orphan') {
+    errors.push('type must be "elder" or "orphan"');
+>>>>>>> 19f8b71913c1e5037a2c08cc577cce08b372d24d
   }
 
   if (typeof payload.age !== 'number' || payload.age <= 0) {
@@ -104,10 +121,13 @@ function validateProfilePayload(payload) {
     }
   });
 
+<<<<<<< HEAD
   if (Array.isArray(payload.hobbies) && payload.hobbies.length === 0) {
     errors.push('hobbies must contain at least one selected value');
   }
 
+=======
+>>>>>>> 19f8b71913c1e5037a2c08cc577cce08b372d24d
   return errors;
 }
 
@@ -121,13 +141,18 @@ export const usersController = {
           .json({ error: 'Firestore not initialized. Check backend config.' });
       }
 
+<<<<<<< HEAD
       const payload = normalizeProfilePayload(req.body || {});
+=======
+      const payload = req.body || {};
+>>>>>>> 19f8b71913c1e5037a2c08cc577cce08b372d24d
       const errors = validateProfilePayload(payload);
       if (errors.length > 0) {
         return res.status(400).json({ errors });
       }
 
       const now = new Date();
+<<<<<<< HEAD
       const docData = {
         ...payload,
         createdAt: now,
@@ -142,11 +167,22 @@ export const usersController = {
       if (typeCollection) {
         await db.collection(typeCollection).doc(docRef.id).set(docData);
       }
+=======
+      const docRef = await db.collection(COLLECTION).add({
+        ...payload,
+        createdAt: now,
+        updatedAt: now,
+      });
+>>>>>>> 19f8b71913c1e5037a2c08cc577cce08b372d24d
 
       return res.status(201).json({ id: docRef.id });
     } catch (err) {
       // In dev, Firestore misconfiguration can surface as a gRPC `5 NOT_FOUND`
+<<<<<<< HEAD
       // error (project/API not found). Return a clear error so callers can fallback.
+=======
+      // error (project/API not found). Don't hard-fail the entire UI.
+>>>>>>> 19f8b71913c1e5037a2c08cc577cce08b372d24d
       const isDevFirestoreNotFound =
         process.env.NODE_ENV !== 'production' &&
         (err?.code === 5 ||
@@ -154,12 +190,20 @@ export const usersController = {
           String(err?.message || '').includes('5 NOT_FOUND'));
 
       if (isDevFirestoreNotFound) {
+<<<<<<< HEAD
         console.error('Firestore write failed:', err?.message || err);
         return res.status(503).json({
           error:
             'Firestore write failed. Check Firebase project/service account configuration.',
           details: err?.message || String(err),
         });
+=======
+        console.warn(
+          'Firestore write failed (dev fallback). Returning mock id.',
+          err?.message || err,
+        );
+        return res.status(201).json({ id: `mock-${Date.now()}` });
+>>>>>>> 19f8b71913c1e5037a2c08cc577cce08b372d24d
       }
 
       return next(err);
