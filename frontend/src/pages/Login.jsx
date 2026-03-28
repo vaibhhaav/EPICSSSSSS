@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { auth } from '../components/firebase.js';
 import { login } from '../services/api.js';
 
 const Login = () => {
@@ -18,10 +20,20 @@ const Login = () => {
     setError('');
     setLoading(true);
     try {
-      await login({ email: form.email, password: form.password });
+      await signInWithEmailAndPassword(auth, form.email, form.password);
+      try {
+        await login({ email: form.email, password: form.password });
+      } catch (apiErr) {
+        await signOut(auth);
+        throw apiErr;
+      }
       navigate('/dashboard');
     } catch (err) {
-      setError(err?.response?.data?.message || 'Login failed. Check credentials.');
+      const msg =
+        err?.code === 'auth/invalid-credential' || err?.code === 'auth/wrong-password'
+          ? 'Invalid email or password.'
+          : err?.response?.data?.message || err?.message || 'Login failed.';
+      setError(msg);
     } finally {
       setLoading(false);
     }

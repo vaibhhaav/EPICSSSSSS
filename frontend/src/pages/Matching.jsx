@@ -1,12 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { collection, onSnapshot } from 'firebase/firestore';
 import MatchCard from '../components/MatchCard.jsx';
-import { autoMatchAll, createMatch, generateMatches, getProfiles } from '../services/api.js';
+import { db } from '../components/firebase.js';
+import { useUser } from '../context/UserContext.jsx';
+import { autoMatchAll, createMatch, generateMatches } from '../services/api.js';
 
 export default function Matching() {
+  const { institutionType } = useUser();
   const [profiles, setProfiles] = useState([]);
   const [orphanId, setOrphanId] = useState('');
   const [matches, setMatches] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [creatingId, setCreatingId] = useState('');
   const [error, setError] = useState('');
   const [autoMatchLoading, setAutoMatchLoading] = useState(false);
@@ -15,23 +19,64 @@ export default function Matching() {
   const [highlightMatchIds, setHighlightMatchIds] = useState([]);
 
   useEffect(() => {
-    (async () => {
-      setLoading(true);
-      try {
-        const data = await getProfiles();
-        setProfiles(data);
-      } catch (err) {
-        setError(err?.response?.data?.message || 'Failed to load profiles.');
-      } finally {
+    const orphansCol = collection(db, 'orphans');
+    const eldersCol = collection(db, 'elders');
+    let orphansList = [];
+    let eldersList = [];
+
+    const mapOrphans = (snap) =>
+      snap.docs.map((d) => ({ id: d.id, ...d.data(), type: 'orphan' }));
+    const mapElders = (snap) =>
+      snap.docs.map((d) => ({ id: d.id, ...d.data(), type: 'elder' }));
+
+    const merge = () => {
+      setProfiles([...orphansList, ...eldersList]);
+      setLoading(false);
+      setError('');
+    };
+
+    const unsubO = onSnapshot(
+      orphansCol,
+      (snap) => {
+        orphansList = mapOrphans(snap);
+        merge();
+      },
+      (err) => {
+        console.error(err);
+        setError('Could not load orphans from Firestore.');
         setLoading(false);
-      }
-    })();
+      },
+    );
+    const unsubE = onSnapshot(
+      eldersCol,
+      (snap) => {
+        eldersList = mapElders(snap);
+        merge();
+      },
+      (err) => {
+        console.error(err);
+        setError('Could not load elders from Firestore.');
+        setLoading(false);
+      },
+    );
+
+    return () => {
+      unsubO();
+      unsubE();
+    };
   }, []);
 
   const orphans = useMemo(
-    () => profiles.filter((profile) => (profile.institutionType || profile.type) === 'orphan'),
+    () => profiles.filter((p) => p.type === 'orphan' || p.institutionType === 'orphanage'),
     [profiles],
   );
+
+  const scopeNote =
+    institutionType === 'orphanage'
+      ? 'Your account manages an orphanage. Matching still uses all orphans and elders visible in this project (Firestore).'
+      : institutionType === 'oldage'
+        ? 'Your account manages an old-age home. Matching still uses all orphans and elders visible in this project (Firestore).'
+        : null;
 
   const runMatching = async () => {
     if (!orphanId) {
@@ -108,7 +153,14 @@ export default function Matching() {
     <section className="space-y-4">
       <div>
         <h2 className="text-2xl font-semibold text-slate-900">Matching</h2>
-        <p className="text-sm text-slate-600">Generate ML-based elder matches for selected orphan profiles.</p>
+        <p className="text-sm text-slate-600">
+          Generate ML-based elder matches for a selected orphan. Profiles update live from Firestore.
+        </p>
+        {scopeNote && (
+          <p className="mt-2 text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+            {scopeNote}
+          </p>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-2">

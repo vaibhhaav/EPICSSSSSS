@@ -15,12 +15,9 @@ from typing import Any, Dict, Iterable, List, Optional, Set
 
 from pathlib import Path
 
-try:
-    import pandas as pd
-    from sklearn.ensemble import RandomForestRegressor
-except Exception:  # pragma: no cover
-    pd = None
-    RandomForestRegressor = None
+import csv
+
+import numpy as np
 
 
 def _as_list(value: Any) -> List[str]:
@@ -282,75 +279,130 @@ def _clamp01(x: float) -> float:
     return float(x)
 
 
-_ML_MODEL = None
-_ML_FEATURE_ORDER = [
-    "age_gap",
-    "personality_match",
-    "emotional_compatibility",
-    "attachment_compatibility",
-    "interest_similarity",
-    "communication_match",
-    "availability_overlap",
-    "support_compatibility",
-    "language_match",
-    "health_factor",
-]
+class LinearRegressor:
+    """
+    NumPy-only ridge-style regressor trained from `dataset.csv`.
+
+    This avoids scikit-learn installation issues (common on Win32 / older GCC).
+    """
+
+    def __init__(self, weights: np.ndarray, bias: float, mu: np.ndarray, sigma: np.ndarray):
+        self.weights = weights
+        self.bias = bias
+        self.mu = mu
+        self.sigma = sigma
+
+    def predict(self, X_rows: List[List[float]] | np.ndarray) -> np.ndarray:
+        X = np.asarray(X_rows, dtype=float)
+        sigma = self.sigma.copy()
+        sigma[sigma == 0] = 1.0
+        Xs = (X - self.mu) / sigma
+        return Xs @ self.weights + float(self.bias)
 
 
-def _train_ml_model_from_csv() -> Any:
-    if pd is None or RandomForestRegressor is None:
-        return None
+_ML_MODEL: Optional[LinearRegressor] = None
 
-    dataset_path = (
-        Path(__file__).resolve().parents[1] / "dataset" / "dataset.csv"
-    )  # .../ml-service/dataset/dataset.csv
 
+def _safe_float(value: Any, default: float = 0.0) -> float:
+    try:
+        if value is None:
+            return default
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _train_ml_model_from_csv() -> Optional[LinearRegressor]:
+    # expected: .../ml-service/dataset/dataset.csv
+    dataset_path = Path(__file__).resolve().parents[1] / "dataset" / "dataset.csv"
     if not dataset_path.exists():
+        print(f"[kindred-ml] Training skipped: no dataset at {dataset_path}", flush=True)
         return None
 
-    df = pd.read_csv(dataset_path)
-    if df.empty or "compatibility_score" not in df.columns:
-        return None
+    print(f"[kindred-ml] Training started: {dataset_path}", flush=True)
 
-    # Convert elder_health_condition into the numeric health_factor used when
-    # generating `compatibility_score` in `scripts/generate_dataset.py`.
-    if "elder_health_condition" in df.columns:
-        df["health_factor"] = df["elder_health_condition"].map(
-            {"good": 1.0, "moderate": 0.5, "critical": 0.2}
+    with dataset_path.open("r", newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        rows = list(reader)
+
+    if not rows or "compatibility_score" not in (rows[0] or {}):
+        print(
+            "[kindred-ml] Training skipped: empty CSV or missing compatibility_score",
+            flush=True,
         )
-    else:
-        df["health_factor"] = 0.5
-    df["health_factor"] = df["health_factor"].fillna(0.5)
+        return None
 
-    feature_cols = [
-        "age_gap",
-        "personality_match",
-        "emotional_compatibility",
-        "attachment_compatibility",
-        "interest_similarity",
-        "communication_match",
-        "availability_overlap",
-        "support_compatibility",
-        "language_match",
-        "health_factor",
-    ]
+    # Column set produced by `scripts/generate_dataset.py`
+    # We convert elder_health_condition -> health_factor inline.
+    health_map = {"good": 1.0, "moderate": 0.5, "critical": 0.2}
 
-    # Ensure required columns exist (some datasets may omit a column).
-    for col in feature_cols:
-        if col not in df.columns:
-            return None
+    X_list: List[List[float]] = []
+    y_list: List[float] = []
 
-    X = df[feature_cols].astype(float).to_numpy()
-    y = df["compatibility_score"].astype(float).to_numpy()
+    for r in rows:
+        y = _safe_float(r.get("compatibility_score"))
+        if not (0.0 <= y <= 1.0):
+            continue
 
-    model = RandomForestRegressor(n_estimators=250, random_state=42)
-    model.fit(X, y)
-    return model
+        health_cond = (r.get("elder_health_condition") or "").strip().lower()
+        health_factor = health_map.get(health_cond, 0.5)
+
+        x = [
+            _safe_float(r.get("age_gap")),
+            _safe_float(r.get("personality_match")),
+            _safe_float(r.get("emotional_compatibility")),
+            _safe_float(r.get("attachment_compatibility")),
+            _safe_float(r.get("interest_similarity")),
+            _safe_float(r.get("communication_match")),
+            _safe_float(r.get("availability_overlap")),
+            _safe_float(r.get("support_compatibility")),
+            _safe_float(r.get("language_match")),
+            float(health_factor),
+        ]
+        X_list.append(x)
+        y_list.append(y)
+
+    if len(X_list) < 10:
+        print(
+            f"[kindred-ml] Training skipped: need ≥10 valid rows, got {len(X_list)}",
+            flush=True,
+        )
+        return None
+
+    X = np.asarray(X_list, dtype=float)
+    y = np.asarray(y_list, dtype=float)
+
+    # Standardize for stable linear solve
+    mu = X.mean(axis=0)
+    sigma = X.std(axis=0)
+    sigma[sigma == 0] = 1.0
+    Xs = (X - mu) / sigma
+
+    # Ridge regression with bias term in closed form
+    ones = np.ones((Xs.shape[0], 1), dtype=float)
+    Xb = np.hstack([Xs, ones])
+    lam = 1e-2
+    I = np.eye(Xb.shape[1], dtype=float)
+    I[-1, -1] = 0.0  # don't regularize bias
+    w = np.linalg.solve(Xb.T @ Xb + lam * I, Xb.T @ y)
+
+    weights = w[:-1]
+    bias = w[-1]
+    print(
+        f"[kindred-ml] Training completed: ridge model fit on {len(X_list)} rows "
+        f"({X.shape[1]} features)",
+        flush=True,
+    )
+    return LinearRegressor(weights=weights, bias=bias, mu=mu, sigma=sigma)
 
 
 try:
     _ML_MODEL = _train_ml_model_from_csv()
-except Exception:
+except Exception as exc:
+    print(
+        f"[kindred-ml] Training failed ({exc!r}); using deterministic fallback scorer",
+        flush=True,
+    )
     _ML_MODEL = None
 
 

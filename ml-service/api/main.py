@@ -17,7 +17,14 @@ Run locally:
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
 from typing import List, Dict, Any
+
+# `profile_matching.py` and `sentiment_analysis.py` live in `ml-models/`, not in `api/`.
+_ML_MODELS_DIR = Path(__file__).resolve().parent.parent / "ml-models"
+if str(_ML_MODELS_DIR) not in sys.path:
+    sys.path.insert(0, str(_ML_MODELS_DIR))
 
 from fastapi import FastAPI
 from pydantic import BaseModel

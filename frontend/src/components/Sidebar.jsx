@@ -1,21 +1,27 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { clearToken } from '../utils/auth.js';
+import { useUser } from '../context/UserContext.jsx';
 
 const links = [
+  { to: '/dashboard', label: 'Home' },
   { to: '/dashboard/profiles', label: 'Profiles' },
   { to: '/dashboard/matching', label: 'Matching' },
   { to: '/dashboard/connections', label: 'Connections' },
   { to: '/dashboard/sessions', label: 'Sessions' },
   { to: '/dashboard/feedback', label: 'Feedback' },
+  { to: '/dashboard/settings', label: 'Settings' },
 ];
 
 export default function Sidebar() {
   const navigate = useNavigate();
+  const { logout } = useUser();
 
-  const logout = () => {
-    clearToken();
-    navigate('/login');
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } finally {
+      navigate('/login');
+    }
   };
 
   return (
@@ -45,7 +51,7 @@ export default function Sidebar() {
 
       <button
         type="button"
-        onClick={logout}
+        onClick={handleLogout}
         className="mt-4 md:mt-6 w-full rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500"
       >
         Logout
