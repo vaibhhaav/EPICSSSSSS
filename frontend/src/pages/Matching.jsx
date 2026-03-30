@@ -4,7 +4,7 @@ import { useUser } from '../context/UserContext.jsx';
 import MatchCard from '../components/MatchCard.jsx';
 import { db } from '../components/firebase.js';
 import {
-  calculateCompatibility,
+  buildMatchResult,
   generateMatchesLocal,
   autoMatchAllLocal,
 } from '../services/matchingEngine.js';
@@ -42,6 +42,23 @@ export default function Matching() {
   const [savingAll, setSavingAll] = useState(false);
 
   const [existingPairs, setExistingPairs] = useState(new Set());
+
+  const isSameProfilePair = (elder, orphan) => {
+    if (!elder || !orphan) return false;
+
+    if (elder.id && orphan.id && elder.id === orphan.id) return true;
+
+    const normalize = (value) => String(value || '').trim().toLowerCase();
+    const elderName = normalize(elder.name || elder.fullName);
+    const orphanName = normalize(orphan.name || orphan.fullName);
+
+    return Boolean(elderName && orphanName && elderName === orphanName);
+  };
+
+  const withDisplayName = (result) => ({
+    ...result,
+    displayName: isOrphanage ? result.elderName : result.orphanName,
+  });
 
   // Load MY institution's profiles
   useEffect(() => {
@@ -121,23 +138,14 @@ export default function Matching() {
         }
 
         results = orphans
-          .map((orphan) => {
-            const score = calculateCompatibility(selectedElder, orphan);
-            return {
-              id: `${selectedElder.id}-${orphan.id}`,
-              elderId: selectedElder.id,
-              elderName: selectedElder.name || selectedElder.fullName || 'Elder',
-              orphanId: orphan.id || '',
-              orphanName: orphan.name || orphan.fullName || 'Orphan',
-              compatibilityScore: Math.round(score * 10000) / 10000,
-              reason: 'ML compatibility match',
-              interests: [],
-            };
-          })
+          .filter((orphan) => !isSameProfilePair(selectedElder, orphan))
+          .map((orphan) => buildMatchResult(selectedElder, orphan))
           .sort((a, b) => b.compatibilityScore - a.compatibilityScore);
       }
 
-      results = results.filter((m) => !existingPairs.has(`${m.orphanId}::${m.elderId}`));
+      results = results
+        .filter((m) => !existingPairs.has(`${m.orphanId}::${m.elderId}`))
+        .map(withDisplayName);
 
       if (!results.length) {
         setError(`No new ${otherLabelPlural} matches available (all pairs already connected).`);
@@ -191,7 +199,14 @@ export default function Matching() {
 
     try {
       const results = autoMatchAllLocal(orphans, elders);
-      const filtered = results.filter((m) => !existingPairs.has(`${m.orphanId}::${m.elderId}`));
+      const filtered = results
+        .filter((m) => {
+          const elder = elders.find((profile) => profile.id === m.elderId);
+          const orphan = orphans.find((profile) => profile.id === m.orphanId);
+          return !isSameProfilePair(elder, orphan);
+        })
+        .filter((m) => !existingPairs.has(`${m.orphanId}::${m.elderId}`))
+        .map(withDisplayName);
 
       if (filtered.length > 0) {
         setMatches(filtered);

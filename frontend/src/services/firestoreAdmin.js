@@ -32,25 +32,39 @@ export function profilesCollectionForInstitution(institutionType) {
   return null;
 }
 
-function normalizeAgeByInstitutionType(institutionType, rawAge) {
+export function getAgeConstraintsForInstitution(institutionType) {
+  if (institutionType === INSTITUTION_TYPES.ORPHANAGE) {
+    return {
+      min: 0,
+      max: 21,
+      label: 'Allowed age: 0 to 21 years',
+    };
+  }
+
+  if (institutionType === INSTITUTION_TYPES.OLDAGE) {
+    return {
+      min: 45,
+      max: 110,
+      label: 'Allowed age: 45 to 110 years',
+    };
+  }
+
+  return {
+    min: 0,
+    max: 120,
+    label: 'Allowed age: 0 to 120 years',
+  };
+}
+
+export function normalizeAgeByInstitutionType(institutionType, rawAge) {
   const n = Number(rawAge);
   if (!Number.isFinite(n)) throw new Error('Age must be a number.');
+  const wholeYears = Math.round(n);
+  const { min, max } = getAgeConstraintsForInstitution(institutionType);
 
-  // Orphans: cap at 21 years
-  if (institutionType === INSTITUTION_TYPES.ORPHANAGE) {
-    if (n < 0) return 0;
-    if (n > 21) return 21;
-    return n;
-  }
-
-  // Elders: clamp into [45, 110]
-  if (institutionType === INSTITUTION_TYPES.OLDAGE) {
-    if (n < 45) return 45;
-    if (n > 110) return 110;
-    return n;
-  }
-
-  return n;
+  if (wholeYears < min) return min;
+  if (wholeYears > max) return max;
+  return wholeYears;
 }
 
 /**

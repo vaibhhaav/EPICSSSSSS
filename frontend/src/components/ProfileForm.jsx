@@ -2,7 +2,9 @@ import React, { useMemo, useState } from 'react';
 import { useUser } from '../context/UserContext.jsx';
 import {
   addProfileDocument,
+  getAgeConstraintsForInstitution,
   INSTITUTION_TYPES,
+  normalizeAgeByInstitutionType,
 } from '../services/firestoreAdmin.js';
 
 const interestOptions = ['music', 'art', 'stories', 'games', 'nature', 'reading'];
@@ -40,6 +42,10 @@ export default function ProfileForm({ open, onClose, onSaved, loading: loadingPr
   const [saving, setSaving] = useState(false);
 
   const isElder = institutionType === INSTITUTION_TYPES.OLDAGE;
+  const ageConstraints = useMemo(
+    () => getAgeConstraintsForInstitution(institutionType),
+    [institutionType],
+  );
   const title = useMemo(
     () => (isElder ? 'Add Elder Profile' : 'Add Orphan Profile'),
     [isElder],
@@ -50,6 +56,17 @@ export default function ProfileForm({ open, onClose, onSaved, loading: loadingPr
   const updateField = (e) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const clampAgeInput = () => {
+    if (form.age === '') return;
+
+    try {
+      const normalizedAge = normalizeAgeByInstitutionType(institutionType, form.age);
+      setForm((prev) => ({ ...prev, age: String(normalizedAge) }));
+    } catch {
+      // Keep the user's input until submit validation handles it.
+    }
   };
 
   const toggleInterest = (value) => {
@@ -98,10 +115,7 @@ export default function ProfileForm({ open, onClose, onSaved, loading: loadingPr
       return;
     }
 
-    // Enforce data rules before persisting.
-    const normalizedAge = isElder
-      ? Math.max(45, Math.min(110, rawAge))
-      : Math.max(0, Math.min(21, rawAge));
+    const normalizedAge = normalizeAgeByInstitutionType(institutionType, rawAge);
 
     const languages = [String(form.language).trim()];
     const payload = {
@@ -167,11 +181,17 @@ export default function ProfileForm({ open, onClose, onSaved, loading: loadingPr
           <input
             name="age"
             type="number"
-            placeholder="Age"
+            min={ageConstraints.min}
+            max={ageConstraints.max}
+            placeholder={`Age (${ageConstraints.min}-${ageConstraints.max})`}
             value={form.age}
             onChange={updateField}
+            onBlur={clampAgeInput}
             className={inputStyle}
           />
+          <p className="md:col-span-2 -mt-1 text-xs text-slate-500">
+            {ageConstraints.label}. Values outside this range are automatically adjusted before saving.
+          </p>
           <select
             name="gender"
             value={form.gender}

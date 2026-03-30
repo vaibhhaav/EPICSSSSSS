@@ -7,16 +7,26 @@ export default function MatchCard({
   showCreateConnection = true,
   highlight = false,
 }) {
+  const compatibilityPercent = Number.isFinite(Number(match.compatibilityScore))
+    ? `${(Number(match.compatibilityScore) * 100).toFixed(2)}%`
+    : '-';
+  const displayName =
+    match.displayName ||
+    match.orphanName ||
+    match.orphan?.name ||
+    match.elderName ||
+    match.elder?.name ||
+    match.name ||
+    `Match #${match.orphanId || match.elderId || match.id}`;
+
   return (
     <div
       className={`rounded-xl border bg-white p-4 shadow-sm ${
         highlight ? 'border-indigo-500 ring-2 ring-indigo-100' : 'border-indigo-100'
       }`}
     >
-      <h3 className="text-sm font-semibold text-slate-900">
-        {match.elderName || match.elder?.name || `Elder #${match.elderId}`}
-      </h3>
-      <p className="mt-1 text-xs text-indigo-700">Compatibility: {match.compatibilityScore}</p>
+      <h3 className="text-sm font-semibold text-slate-900">{displayName}</h3>
+      <p className="mt-1 text-xs text-indigo-700">Compatibility: {compatibilityPercent}</p>
       <p className="mt-2 text-xs text-slate-600">{match.reason || match.matchReason || 'No reason provided.'}</p>
       {showCreateConnection && typeof onCreateConnection === 'function' && (
         <button

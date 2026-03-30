@@ -3,8 +3,6 @@ import { onAuthStateChanged, signOut } from 'firebase/auth';
 import {
   doc,
   onSnapshot,
-  serverTimestamp,
-  setDoc,
 } from 'firebase/firestore';
 import { auth, db } from '../components/firebase.js';
 import { clearToken } from '../utils/auth.js';
@@ -37,35 +35,18 @@ export function UserProvider({ children }) {
 
     const unsub = onSnapshot(
       userRef,
-      async (snap) => {
-        try {
-          if (!snap.exists()) {
-            await setDoc(
-              userRef,
-              {
-                userId: firebaseUser.uid,
-                email: firebaseUser.email || '',
-                role: 'admin',
-                institutionId: null,
-                institutionType: null,
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp(),
-              },
-              { merge: true },
-            );
-            return;
-          }
-          setUserDoc({ id: snap.id, ...snap.data() });
-        } catch (e) {
-          console.error(e);
+      (snap) => {
+        if (!snap.exists()) {
           setUserDoc(null);
-        } finally {
-          if (snap.exists()) {
-            setUserDocLoading(false);
-          }
+          setUserDocLoading(false);
+          return;
         }
+
+        setUserDoc({ id: snap.id, ...snap.data() });
+        setUserDocLoading(false);
       },
       () => {
+        setUserDoc(null);
         setUserDocLoading(false);
       },
     );

@@ -221,28 +221,30 @@ export function calculateCompatibility(elder, orphan) {
   return mlPredict(vec);
 }
 
+export function buildMatchResult(elder, orphan) {
+  const elderF = extractFeatures(elder);
+  const orphanF = extractFeatures(orphan);
+  const vec = buildFeatureVector(elderF, orphanF);
+  const score = mlPredict(vec);
+
+  return {
+    id: `${elder?.id || 'elder'}-${orphan?.id || 'orphan'}`,
+    elderId: elder?.id || '',
+    elderName: elder?.name || elder?.fullName || 'Elder',
+    orphanId: orphan?.id || '',
+    orphanName: orphan?.name || orphan?.fullName || 'Orphan',
+    compatibilityScore: Math.round(score * 10000) / 10000,
+    reason: generateReason(elderF, orphanF),
+    interests: [...elderF.interests],
+  };
+}
+
 export function generateMatchesLocal(orphanId, allOrphans, allElders) {
   const orphan = allOrphans.find((o) => o.id === orphanId);
   if (!orphan) return [];
 
-  const orphanF = extractFeatures(orphan);
-
   return allElders
-    .map((elder) => {
-      const elderF = extractFeatures(elder);
-      const vec = buildFeatureVector(elderF, orphanF);
-      const score = mlPredict(vec);
-      return {
-        id: elder.id || '',
-        elderId: elder.id || '',
-        elderName: elder.name || elder.fullName || 'Elder',
-        orphanId,
-        orphanName: orphan.name || orphan.fullName || 'Orphan',
-        compatibilityScore: Math.round(score * 10000) / 10000,
-        reason: generateReason(elderF, orphanF),
-        interests: [...elderF.interests],
-      };
-    })
+    .map((elder) => buildMatchResult(elder, orphan))
     .sort((a, b) => b.compatibilityScore - a.compatibilityScore);
 }
 
@@ -289,4 +291,3 @@ export function autoMatchAllLocal(allOrphans, allElders) {
 
   return results.sort((a, b) => b.compatibilityScore - a.compatibilityScore);
 }
-

@@ -62,6 +62,13 @@ export default function DashboardHome() {
     return <InstitutionSetup />;
   }
 
+  const quickActions = [
+    { label: 'Add Profile', to: '/dashboard/profiles', icon: UserPlus },
+    { label: 'Run Matching', to: '/dashboard/matching', icon: BarChart3 },
+    { label: 'View Connections', to: '/dashboard/connections', icon: Link2 },
+    { label: 'Settings', to: '/dashboard/settings', icon: Settings },
+  ];
+
   return (
     <section className="space-y-6">
       <div>
@@ -91,46 +98,24 @@ export default function DashboardHome() {
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-600 uppercase tracking-wide">Quick Actions</h3>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <button
-            type="button"
-            onClick={() => navigate('/dashboard/profiles')}
-            className="rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            <div className="flex items-center gap-2">
-              <UserPlus size={16} />
-              <span>Add Profile</span>
-            </div>
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate('/dashboard/matching')}
-            className="rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            <div className="flex items-center gap-2">
-              <BarChart3 size={16} />
-              <span>Run Matching</span>
-            </div>
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate('/dashboard/connections')}
-            className="rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            <div className="flex items-center gap-2">
-              <Link2 size={16} />
-              <span>View Connections</span>
-            </div>
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate('/dashboard/settings')}
-            className="rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            <div className="flex items-center gap-2">
-              <Settings size={16} />
-              <span>Settings</span>
-            </div>
-          </button>
+          {quickActions.map((action) => {
+            const Icon = action.icon;
+            return (
+              <button
+                key={action.to}
+                type="button"
+                onClick={() => navigate(action.to)}
+                className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm transition hover:border-indigo-200 hover:bg-slate-50"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                    <Icon size={18} />
+                  </div>
+                  <span>{action.label}</span>
+                </div>
+              </button>
+            );
+          })}
         </div>
       </div>
     </section>

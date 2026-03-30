@@ -2,6 +2,7 @@ import React from 'react';
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import Home from '../pages/Home.jsx';
 import Login from '../pages/Login.jsx';
+import Signup from '../pages/Signup.jsx';
 import Dashboard from '../pages/Dashboard.jsx';
 import DashboardHome from '../pages/DashboardHome.jsx';
 import Profiles from '../pages/Profiles.jsx';
@@ -36,6 +37,7 @@ export default function AppRoutes() {
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/login" element={<Login />} />
+      <Route path="/signup" element={<Signup />} />
 
       <Route element={<ProtectedRoute />}>
         <Route path="/dashboard" element={<Dashboard />}>
