@@ -4,9 +4,9 @@ import Sidebar from '../components/Sidebar.jsx';
 
 const Dashboard = () => {
   return (
-    <div className="min-h-screen bg-indigo-50 md:flex">
+    <div className="min-h-screen bg-slate-50 md:flex">
       <Sidebar />
-      <main className="min-w-0 flex-1 p-3 sm:p-4 md:p-6">
+      <main className="min-w-0 flex-1 p-4 md:p-6 lg:p-8">
         <Outlet />
       </main>
     </div>

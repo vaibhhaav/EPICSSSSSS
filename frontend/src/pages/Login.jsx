@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { Heart } from 'lucide-react';
 import { auth } from '../components/firebase.js';
 import { login } from '../services/api.js';
 
@@ -40,10 +41,17 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-blue-50 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-blue-50 px-4 py-10">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-md border border-indigo-100 p-6">
-        <h1 className="text-xl font-semibold text-slate-900 mb-1">Kindred Connect</h1>
-        <p className="text-sm text-slate-500 mb-4">Sign in to continue to the workflow dashboard.</p>
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center">
+            <Heart className="h-6 w-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl font-semibold text-slate-900">Kindred Connect</h1>
+            <p className="text-sm text-slate-500">Sign in to continue to the workflow dashboard.</p>
+          </div>
+        </div>
 
         {error && (
           <p className="mb-3 text-xs text-red-600 border border-red-200 bg-red-50 rounded-md px-2 py-1">
@@ -60,7 +68,8 @@ const Login = () => {
               value={form.email}
               onChange={handleChange}
               required
-              className="w-full rounded-md border-slate-300"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="admin@example.com"
             />
           </label>
           <label className="space-y-1 block">
@@ -71,13 +80,14 @@ const Login = () => {
               value={form.password}
               onChange={handleChange}
               required
-              className="w-full rounded-md border-slate-300"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="••••••••"
             />
           </label>
           <button
             type="submit"
             disabled={loading}
-            className="w-full inline-flex items-center justify-center px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-300"
+            className="w-full inline-flex items-center justify-center px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-300 disabled:opacity-60"
           >
             {loading ? 'Signing in…' : 'Sign in'}
           </button>

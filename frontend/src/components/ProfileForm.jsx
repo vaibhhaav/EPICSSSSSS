@@ -92,10 +92,21 @@ export default function ProfileForm({ open, onClose, onSaved, loading: loadingPr
       return;
     }
 
+    const rawAge = Number(form.age);
+    if (!Number.isFinite(rawAge)) {
+      setError('Age must be a number.');
+      return;
+    }
+
+    // Enforce data rules before persisting.
+    const normalizedAge = isElder
+      ? Math.max(45, Math.min(110, rawAge))
+      : Math.max(0, Math.min(21, rawAge));
+
     const languages = [String(form.language).trim()];
     const payload = {
       name: String(form.name).trim(),
-      age: Number(form.age),
+      age: normalizedAge,
       gender: String(form.gender).trim(),
       personalityType: String(form.personalityType).trim(),
       emotionalState: String(form.emotionalState).trim(),

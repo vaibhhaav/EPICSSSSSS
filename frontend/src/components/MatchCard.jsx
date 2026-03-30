@@ -17,7 +17,7 @@ export default function MatchCard({
         {match.elderName || match.elder?.name || `Elder #${match.elderId}`}
       </h3>
       <p className="mt-1 text-xs text-indigo-700">Compatibility: {match.compatibilityScore}</p>
-      <p className="mt-2 text-xs text-slate-600">{match.matchReason || 'No reason provided.'}</p>
+      <p className="mt-2 text-xs text-slate-600">{match.reason || match.matchReason || 'No reason provided.'}</p>
       {showCreateConnection && typeof onCreateConnection === 'function' && (
         <button
           type="button"

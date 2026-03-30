@@ -32,6 +32,27 @@ export function profilesCollectionForInstitution(institutionType) {
   return null;
 }
 
+function normalizeAgeByInstitutionType(institutionType, rawAge) {
+  const n = Number(rawAge);
+  if (!Number.isFinite(n)) throw new Error('Age must be a number.');
+
+  // Orphans: cap at 21 years
+  if (institutionType === INSTITUTION_TYPES.ORPHANAGE) {
+    if (n < 0) return 0;
+    if (n > 21) return 21;
+    return n;
+  }
+
+  // Elders: clamp into [45, 110]
+  if (institutionType === INSTITUTION_TYPES.OLDAGE) {
+    if (n < 45) return 45;
+    if (n > 110) return 110;
+    return n;
+  }
+
+  return n;
+}
+
 /**
  * One institution per admin. Creates institution + links user in a transaction.
  */
@@ -117,8 +138,16 @@ export async function addProfileDocument({
   if (!col) throw new Error('Invalid institution type');
 
   const type = profileTypeFromInstitutionType(institutionType);
+  if (!type) throw new Error('Invalid profile type for institution.');
+
+  // Ensure `age` is stored with the correct bounds in Firestore.
+  const normalizedAge = normalizeAgeByInstitutionType(institutionType, payload?.age);
+  const payloadWithNormalizedAge = {
+    ...payload,
+    age: normalizedAge,
+  };
   const cleaned = Object.fromEntries(
-    Object.entries(payload).filter(([, v]) => v !== null && v !== undefined && v !== ''),
+    Object.entries(payloadWithNormalizedAge).filter(([, v]) => v !== null && v !== undefined && v !== ''),
   );
   const docRef = await addDoc(collection(db, col), {
     ...cleaned,

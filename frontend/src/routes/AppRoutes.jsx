@@ -10,6 +10,7 @@ import Matching from '../pages/Matching.jsx';
 import Connections from '../pages/Connections.jsx';
 import Sessions from '../pages/Sessions.jsx';
 import Feedback from '../pages/Feedback.jsx';
+import NotFound from '../pages/NotFound.jsx';
 import { useUser } from '../context/UserContext.jsx';
 import { getToken } from '../utils/auth.js';
 
@@ -48,7 +49,7 @@ export default function AppRoutes() {
         </Route>
       </Route>
 
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 }
