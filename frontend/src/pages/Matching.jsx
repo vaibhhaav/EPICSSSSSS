@@ -42,6 +42,7 @@ export default function Matching() {
   const [savingAll, setSavingAll] = useState(false);
 
   const [existingPairs, setExistingPairs] = useState(new Set());
+  const getMatchKey = (match) => match.id || `${match.elderId}-${match.orphanId}`;
 
   const isSameProfilePair = (elder, orphan) => {
     if (!elder || !orphan) return false;
@@ -168,7 +169,8 @@ export default function Matching() {
       return;
     }
 
-    setCreatingId(match.elderId || match.id);
+    const matchKey = getMatchKey(match);
+    setCreatingId(matchKey);
     setError('');
     try {
       await createConnectionDoc({
@@ -180,6 +182,8 @@ export default function Matching() {
         institutionId,
       });
       setSuccessMessage(`Connection created: ${match.orphanName} ↔ ${match.elderName}`);
+      setMatches((current) => current.filter((item) => getMatchKey(item) !== matchKey));
+      setHighlightMatchIds((current) => current.filter((id) => id !== matchKey));
     } catch (err) {
       console.error(err);
       setError(err?.message || 'Failed to create connection.');
@@ -328,11 +332,11 @@ export default function Matching() {
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {matches.map((match) => (
             <MatchCard
-              key={match.id || `${match.elderId}-${match.orphanId}`}
+              key={getMatchKey(match)}
               match={match}
-              loading={creatingId === (match.elderId || match.id)}
+              loading={creatingId === getMatchKey(match)}
               onCreateConnection={createConnection}
-              showCreateConnection={!autoMatched}
+              showCreateConnection
               highlight={autoMatched && highlightMatchIds.includes(match.id)}
             />
           ))}
