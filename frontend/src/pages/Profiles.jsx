@@ -5,7 +5,10 @@ import ProfileForm from '../components/ProfileForm.jsx';
 import ProfileCard from '../components/ProfileCard.jsx';
 import { db } from '../components/firebase.js';
 import { useUser } from '../context/UserContext.jsx';
-import { profilesCollectionForInstitution } from '../services/firestoreAdmin.js';
+import {
+  deleteProfileDocument,
+  profilesCollectionForInstitution,
+} from '../services/firestoreAdmin.js';
 import InstitutionSetup from '../components/InstitutionSetup.jsx';
 
 export default function Profiles() {
@@ -14,6 +17,7 @@ export default function Profiles() {
   const [profiles, setProfiles] = useState([]);
   const [formOpen, setFormOpen] = useState(false);
   const [error, setError] = useState('');
+  const [deletingId, setDeletingId] = useState('');
 
   useEffect(() => {
     if (!institutionId || !institutionType) {
@@ -71,6 +75,27 @@ export default function Profiles() {
   const label =
     institutionType === 'oldage' ? 'Elders' : 'Orphans';
 
+  const handleDeleteProfile = async (profile) => {
+    if (!institutionType || !profile?.id) return;
+
+    const profileName = profile.name || profile.fullName || 'this profile';
+    if (!window.confirm(`Delete ${profileName}? This action cannot be undone.`)) return;
+
+    setDeletingId(profile.id);
+    setError('');
+    try {
+      await deleteProfileDocument({
+        institutionType,
+        profileId: profile.id,
+      });
+    } catch (err) {
+      console.error(err);
+      setError(err?.message || 'Failed to delete profile.');
+    } finally {
+      setDeletingId('');
+    }
+  };
+
   return (
     <section className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -93,7 +118,12 @@ export default function Profiles() {
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {profiles.map((profile) => (
-          <ProfileCard key={profile.id} profile={profile} />
+          <ProfileCard
+            key={profile.id}
+            profile={profile}
+            onDelete={handleDeleteProfile}
+            deleting={deletingId === profile.id}
+          />
         ))}
         {profiles.length === 0 && !error && (
           <div className="rounded-xl border border-dashed border-indigo-200 bg-white p-6 text-sm text-slate-500">

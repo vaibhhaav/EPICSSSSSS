@@ -2,6 +2,7 @@ import {
   addDoc,
   collection,
   deleteField,
+  deleteDoc,
   doc,
   getDocs,
   query,
@@ -173,4 +174,12 @@ export async function addProfileDocument({
     updatedAt: serverTimestamp(),
   });
   return docRef.id;
+}
+
+export async function deleteProfileDocument({ institutionType, profileId }) {
+  const col = profilesCollectionForInstitution(institutionType);
+  if (!col) throw new Error('Invalid institution type');
+  if (!profileId) throw new Error('Profile ID is required');
+
+  await deleteDoc(doc(db, col, profileId));
 }
